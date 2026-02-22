@@ -1,0 +1,22 @@
+{
+  "name": "terminal-ui-kit",
+  "main": "./src/lib.ts",
+  "types": "./src/lib.ts",
+  "exports": {
+    ".": "./src/lib.ts"
+  },
+  "scripts": {
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit ",
+    "sanity": "bun run format && bun run typecheck && bun test",
+    "dev": "bun run --watch src/cli.ts"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
