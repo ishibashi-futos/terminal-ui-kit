@@ -1,16 +1,16 @@
-import { MultiLineInput, select } from "./lib";
+import { select, input, HistoryManager } from "./lib";
 
 // 実行例
-const input = new MultiLineInput("Prompt > ");
+const history = new HistoryManager();
 while (true) {
   const selected = await select("お試しするアクションを選択してください", [
-    { label: "✒️ 複数行入力", value: "multi-line-input" },
+    { label: "✒️ 複数行入力(関数版)", value: "multi-line-input-fn" },
     { label: "❌ 終了", value: "exit" },
   ]);
 
   switch (selected) {
-    case "multi-line-input": {
-      const result = await input.ask();
+    case "multi-line-input-fn": {
+      const result = await input("Prompt > ", history);
       console.log("--- 送信内容 ---");
       console.log(result.trim());
       break;

@@ -1,5 +1,5 @@
-import { ANSI } from "../core/ansi";
-import { Terminal } from "../core/terminal";
+import { ANSI } from "../../core/ansi";
+import { Terminal } from "../../core/terminal";
 
 interface Choice<T = string> {
   label: string;

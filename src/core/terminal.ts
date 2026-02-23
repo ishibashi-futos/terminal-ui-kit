@@ -44,7 +44,6 @@ export class Terminal {
     keyMap: Partial<Record<KeyName, KeyHandler>>,
     onAnyChar?: (char: string) => void,
   ) {
-
     this.handlers.clear();
     this.onAnyCharHandler = onAnyChar;
 
@@ -77,7 +76,6 @@ export class Terminal {
     this.lastLines = lines.length;
   }
 
-  // 入力系：生の入力をイベントとして扱う
   onKey(callback: (chunk: string) => void) {
     this.stdin.setRawMode(true);
     this.stdin.resume();
@@ -91,7 +89,6 @@ export class Terminal {
     this.stdin.pause();
   }
 
-  // 終了系：直接 exit せず、クリーンアップの機会を与える
   exit() {
     this.stdout.write(ANSI.COLOR.RESET + "\n");
     process.exit();

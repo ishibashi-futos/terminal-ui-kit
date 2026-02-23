@@ -1,2 +1,2 @@
 - [ ] `Cmd + V`(Pasete) で表示がバグる。
-- [ ] `input.ts` の関数化
+- [x] `input.ts` の関数化
