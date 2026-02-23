@@ -19,7 +19,7 @@ export async function select<T>(
       term.update(lines);
     };
 
-    const cleanup = term.onAction({
+    const cleanup = term.bindActions({
       UP: () => {
         selectedIndex = (selectedIndex - 1 + choices.length) % choices.length;
         render();

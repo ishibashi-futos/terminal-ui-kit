@@ -3,50 +3,63 @@ import { KEYS, type KeyName } from "./keys";
 type KeyHandler = (chunk: string) => unknown;
 type stdin = typeof process.stdin;
 type stdout = typeof process.stdout;
-type Cleanup = () => void;
 
 export class Terminal {
   private handlers: Map<string, KeyHandler> = new Map();
+  private onAnyCharHandler?: (chunk: string) => unknown;
   private lastLines = 0;
+  private handler = (chunk: string) => {
+    if (chunk === KEYS.CTRL_C) {
+      this.exit();
+      return;
+    }
+
+    const handler = this.handlers.get(chunk);
+    if (handler) {
+      handler(chunk);
+      return;
+    }
+
+    if (this.onAnyCharHandler && !chunk.startsWith("\u001b")) {
+      this.onAnyCharHandler(chunk);
+    }
+  };
 
   constructor(
     private stdin: stdin = process.stdin,
     private stdout: stdout = process.stdout,
-  ) {}
+  ) {
+    this.setupRawMode();
+  }
 
-  onAction(
-    keyMap: Partial<Record<KeyName, KeyHandler>>,
-    onAnyChar?: (chunk: string) => Promise<void>,
-  ): Cleanup {
-    const handler = (chunk: string) => {
-      // 1. 登録された特殊キー（同時押し含む）を完全一致でチェック
-      for (const [name, code] of Object.entries(KEYS)) {
-        if (chunk === code && keyMap[name as KeyName]) {
-          keyMap[name as KeyName]!(chunk);
-          return;
-        }
-      }
-
-      // 2. エスケープシーケンス (\u001b) で始まるが KEYS にないものは、未知の同時押しや特殊キー
-      if (chunk.startsWith("\u001b")) {
-        // 必要ならここでログを出して、未知のキーコードを特定できるようにする
-        return;
-      }
-
-      // 3. それ以外は通常の文字入力
-      if (onAnyChar) {
-        onAnyChar(chunk);
-      }
-    };
-
+  private setupRawMode() {
     this.stdin.setRawMode(true);
     this.stdin.resume();
     this.stdin.setEncoding("utf8");
-    this.stdin.on("data", handler);
 
+    this.stdin.on("data", this.handler);
+  }
+
+  bindActions(
+    keyMap: Partial<Record<KeyName, KeyHandler>>,
+    onAnyChar?: (char: string) => void,
+  ) {
+
+    this.handlers.clear();
+    this.onAnyCharHandler = onAnyChar;
+
+    for (const [name, action] of Object.entries(keyMap)) {
+      const code = KEYS[name as KeyName];
+      if (code && action) {
+        this.handlers.set(code, action);
+      }
+    }
+
+    // cleanup
     return () => {
-      // 戻り値でクリーンアップ関数を返す（便利！）
-      this.stdin.off("data", handler);
+      this.handlers.clear();
+      this.onAnyCharHandler = undefined;
+      this.stdin.off("data", this.handler);
       this.stdin.setRawMode(false);
       this.stdin.pause();
     };
