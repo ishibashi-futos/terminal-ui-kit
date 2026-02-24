@@ -4,6 +4,7 @@ interface InputLayout {
   lines: string[]; // ターミナルに描画する行の配列
   cursorRow: number; // カーソルが位置すべき行（0オリジン）
   cursorCol: number; // カーソルが位置すべき列（0オリジン、表示幅ベース）
+  totalRows: number; // 自動折り返し後を含む全表示行数
 }
 
 /**
@@ -14,6 +15,7 @@ export function buildInputLines(
   cursorIndex: number,
   prompt: string,
   promptWidth: number,
+  terminalWidth?: number,
 ): InputLayout {
   const indent = " ".repeat(promptWidth);
   const rawLines = buffer.split("\n");
@@ -23,11 +25,23 @@ export function buildInputLines(
   let cursorCol = 0;
   let remainingIndex = cursorIndex;
   let foundCursor = false;
+  let visualRowOffset = 0;
+  const hasWrap = typeof terminalWidth === "number" && terminalWidth > 0;
+
+  const getWrappedRowOffset = (displayWidth: number) => {
+    if (!hasWrap) {
+      return 0;
+    }
+
+    return Math.floor(displayWidth / terminalWidth);
+  };
 
   rawLines.forEach((line, i) => {
     // 1. 表示文字列の構築
     const prefix = i === 0 ? prompt : indent;
-    displayLines.push(prefix + line);
+    const displayLine = prefix + line;
+    const displayLineWidth = getDisplayWidth(displayLine);
+    displayLines.push(displayLine);
 
     // 2. カーソル位置の計算（まだ見つかっていない場合）
     if (!foundCursor) {
@@ -36,27 +50,43 @@ export function buildInputLines(
 
       if (remainingIndex <= line.length) {
         // この行の中にカーソルがある
-        cursorRow = i;
         // 日本語（全角）を考慮して表示幅で列を計算
         const textBeforeCursor = line.slice(0, remainingIndex);
-        cursorCol = promptWidth + getDisplayWidth(textBeforeCursor);
+        const rawCursorCol = promptWidth + getDisplayWidth(textBeforeCursor);
+        const wrappedCursorRowOffset = getWrappedRowOffset(rawCursorCol);
+        cursorRow = visualRowOffset + wrappedCursorRowOffset;
+        cursorCol = hasWrap ? rawCursorCol % terminalWidth : rawCursorCol;
         foundCursor = true;
       } else {
         remainingIndex -= lineLengthWithSeparator;
       }
     }
+
+    if (i < rawLines.length - 1) {
+      // 改行文字のぶん 1 行進む + 行内の自動折り返しぶん進む
+      visualRowOffset += getWrappedRowOffset(displayLineWidth) + 1;
+    }
   });
 
   // 万が一、インデックスが末尾を超えていた場合のフォールバック
   if (!foundCursor) {
-    cursorRow = rawLines.length - 1;
-    cursorCol = promptWidth + getDisplayWidth(rawLines[cursorRow]!);
+    const fallbackLineIndex = rawLines.length - 1;
+    const rawCursorCol =
+      promptWidth + getDisplayWidth(rawLines[fallbackLineIndex]!);
+    const wrappedCursorRowOffset = getWrappedRowOffset(rawCursorCol);
+    cursorRow = visualRowOffset + wrappedCursorRowOffset;
+    cursorCol = hasWrap ? rawCursorCol % terminalWidth : rawCursorCol;
   }
+
+  const lastDisplayLine = displayLines[displayLines.length - 1] ?? "";
+  const totalRows =
+    visualRowOffset + getWrappedRowOffset(getDisplayWidth(lastDisplayLine)) + 1;
 
   return {
     lines: displayLines,
     cursorRow,
     cursorCol,
+    totalRows,
   };
 }
 

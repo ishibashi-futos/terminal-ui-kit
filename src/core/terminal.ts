@@ -65,7 +65,7 @@ export class Terminal {
     };
   }
 
-  update(lines: string[]) {
+  update(lines: string[], totalRows: number = lines.length) {
     if (this.lastLines > 0) {
       this.stdout.write("\r");
 
@@ -78,8 +78,8 @@ export class Terminal {
 
     this.stdout.write(lines.join("\n"));
 
-    this.lastLines = lines.length;
-    this.currentCursorRow = Math.max(lines.length - 1, 0);
+    this.lastLines = totalRows;
+    this.currentCursorRow = Math.max(totalRows - 1, 0);
   }
 
   onKey(callback: (chunk: string) => void) {
@@ -110,6 +110,15 @@ export class Terminal {
     const dy = targetRow - (totalLines - 1);
     this.moveCursor(targetCol, dy);
     this.currentCursorRow = targetRow;
+  }
+
+  getWidth(): number {
+    const columns = this.stdout.columns;
+    if (typeof columns === "number" && columns > 0) {
+      return columns;
+    }
+
+    return 80;
   }
 
   exit() {

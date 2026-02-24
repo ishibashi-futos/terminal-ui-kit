@@ -15,14 +15,15 @@ export async function input(
 
   return new Promise((resolve) => {
     const render = () => {
-      const { lines, cursorRow, cursorCol } = buildInputLines(
+      const { lines, cursorRow, cursorCol, totalRows } = buildInputLines(
         buffer,
         cursorIndex,
         prompt,
         promptWidth,
+        term.getWidth(),
       );
-      term.update(lines);
-      term.setCursorPosition(cursorRow, cursorCol, lines.length);
+      term.update(lines, totalRows);
+      term.setCursorPosition(cursorRow, cursorCol, totalRows);
     };
 
     const resetVerticalPreference = () => {
