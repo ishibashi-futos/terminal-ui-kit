@@ -8,6 +8,7 @@ export class Terminal {
   private handlers: Map<string, KeyHandler> = new Map();
   private onAnyCharHandler?: (chunk: string) => unknown;
   private lastLines = 0;
+  private currentCursorRow = 0;
   private handler = (chunk: string) => {
     if (chunk === KEYS.CTRL_C) {
       this.exit();
@@ -65,15 +66,20 @@ export class Terminal {
   }
 
   update(lines: string[]) {
-    if (this.lastLines > 1) {
-      this.stdout.write(ANSI.CURSOR_UP(this.lastLines - 1));
+    if (this.lastLines > 0) {
+      this.stdout.write("\r");
+
+      if (this.currentCursorRow > 0) {
+        this.stdout.write(ANSI.CURSOR_UP(this.currentCursorRow));
+      }
     }
 
-    this.stdout.write("\r" + ANSI.ERASE_DOWN);
+    this.stdout.write(ANSI.ERASE_DOWN);
 
     this.stdout.write(lines.join("\n"));
 
     this.lastLines = lines.length;
+    this.currentCursorRow = Math.max(lines.length - 1, 0);
   }
 
   onKey(callback: (chunk: string) => void) {
@@ -89,6 +95,23 @@ export class Terminal {
     this.stdin.pause();
   }
 
+  moveCursor(dx: number, dy: number) {
+    let sequence = "";
+    if (dy < 0) sequence += `\u001b[${Math.abs(dy)}A`; // 上
+    if (dy > 0) sequence += `\u001b[${dy}B`; // 下
+    sequence += "\r"; // 行頭
+    if (dx > 0) sequence += `\u001b[${dx}C`; // 右へ移動
+
+    this.stdout.write(sequence);
+  }
+
+  setCursorPosition(targetRow: number, targetCol: number, totalLines: number) {
+    // 現在は最終行の末尾にいるので、そこからの相対距離
+    const dy = targetRow - (totalLines - 1);
+    this.moveCursor(targetCol, dy);
+    this.currentCursorRow = targetRow;
+  }
+
   exit() {
     this.stdout.write(ANSI.COLOR.RESET + "\n");
     process.exit();
@@ -97,5 +120,6 @@ export class Terminal {
   finalize() {
     this.stdout.write("\n");
     this.lastLines = 0;
+    this.currentCursorRow = 0;
   }
 }

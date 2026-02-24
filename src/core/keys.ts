@@ -2,6 +2,8 @@ export const KEYS = {
   // 基本操作
   UP: "\u001b[A",
   DOWN: "\u001b[B",
+  LEFT: "\u001b[D",
+  RIGHT: "\u001b[C",
   ENTER: "\r",
   BACKSPACE: "\u007f",
   SUBMIT: "\u000a", // Ctrl + J

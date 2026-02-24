@@ -40,4 +40,9 @@ export class HistoryManager {
     }
     return null;
   }
+
+  reset(currentBuffer: string): void {
+    this.index = -1;
+    this.tempBuffer = currentBuffer;
+  }
 }
