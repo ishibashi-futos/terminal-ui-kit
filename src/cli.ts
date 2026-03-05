@@ -29,6 +29,10 @@ while (true) {
       label: "🖨️ status/log/error 表示サンプル",
       value: "display-api-sample",
     },
+    {
+      label: "📝 select + 自由入力サンプル",
+      value: "select-custom-input-sample",
+    },
     { label: "❌ 終了", value: "exit" },
   ]);
 
@@ -145,6 +149,22 @@ while (true) {
       printToolCall("read_file", { path: "./README.md" });
       printToolCall("exec", "bun test");
       printError("テスト実行に失敗しました");
+      break;
+    }
+    case "select-custom-input-sample": {
+      const plan = await select(
+        "今日やるタスクを選択/入力してください",
+        [
+          { label: "ドキュメント作成", value: "docs" },
+          { label: "テスト追加", value: "test" },
+          { label: "リファクタリング", value: "refactor" },
+        ],
+        {
+          allowCustomInput: true,
+          customInputLabel: "✍️ その他を入力",
+        },
+      );
+      console.log(`[select-custom-input] result=${plan}`);
       break;
     }
   }

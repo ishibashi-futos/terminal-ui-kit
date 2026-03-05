@@ -1,4 +1,8 @@
-import { select } from "./components/select/component";
+import {
+  type Choice,
+  type SelectOptions,
+  select,
+} from "./components/select/component";
 import {
   type InputOptions,
   type InputResult,
@@ -37,5 +41,7 @@ export type {
   InputOptions,
   InputResult,
   SpinnerOptions,
+  Choice,
+  SelectOptions,
   WithSpinnerOptions,
 };

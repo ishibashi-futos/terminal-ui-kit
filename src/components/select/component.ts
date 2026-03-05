@@ -1,64 +1,97 @@
-import { ANSI } from "../../core/ansi";
 import { Terminal } from "../../core/terminal";
+import {
+  buildSelectItems,
+  buildSelectLines,
+  normalizeSelectInputChunk,
+  type Choice,
+  type SelectOptions,
+} from "./helpers";
 
-interface Choice<T = string> {
-  label: string;
-  value: T;
-}
+export type { Choice, SelectOptions };
 
-export async function select<T>(
+export function select<T>(prompt: string, choices: Choice<T>[]): Promise<T>;
+export function select<T>(
   prompt: string,
   choices: Choice<T>[],
-): Promise<T> {
+  options: SelectOptions & { allowCustomInput: true },
+): Promise<T | string>;
+export function select<T>(
+  prompt: string,
+  choices: Choice<T>[],
+  options: SelectOptions = {},
+): Promise<T | string> {
   const term = new Terminal();
+  const items = buildSelectItems(choices, options);
   let selectedIndex = 0;
+  let customInput = "";
 
   return new Promise((resolve) => {
+    const isCustomSelected = () => items[selectedIndex]?.type === "custom";
+
     const render = () => {
-      const lines = buildSelectLines(prompt, choices, selectedIndex);
-      term.update(lines);
+      const terminalWidth = term.getWidth();
+      const layout = buildSelectLines(
+        prompt,
+        items,
+        selectedIndex,
+        terminalWidth,
+        customInput,
+      );
+      term.update(layout.lines, layout.totalRows);
     };
 
-    const cleanup = term.bindActions({
-      UP: () => {
-        selectedIndex = (selectedIndex - 1 + choices.length) % choices.length;
+    const cleanup = term.bindActions(
+      {
+        UP: () => {
+          selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+          render();
+        },
+        DOWN: () => {
+          selectedIndex = (selectedIndex + 1) % items.length;
+          render();
+        },
+        BACKSPACE: () => {
+          if (!isCustomSelected() || customInput.length === 0) {
+            return;
+          }
+
+          customInput = customInput.slice(0, -1);
+          render();
+        },
+        ENTER: () => {
+          const selectedItem = items[selectedIndex];
+          if (!selectedItem) {
+            return;
+          }
+
+          if (selectedItem.type === "custom") {
+            cleanup();
+            term.finalize();
+            resolve(customInput.trim());
+            return;
+          }
+
+          cleanup();
+          term.finalize();
+          resolve(selectedItem.choice.value);
+        },
+        CTRL_C: () => term.exit(),
+      },
+      (chunk) => {
+        if (!isCustomSelected()) {
+          return;
+        }
+
+        const normalized = normalizeSelectInputChunk(chunk);
+        if (!normalized) {
+          return;
+        }
+
+        customInput += normalized;
         render();
       },
-      DOWN: () => {
-        selectedIndex = (selectedIndex + 1) % choices.length;
-        render();
-      },
-      ENTER: () => {
-        cleanup();
-        term.finalize();
-        resolve(choices[selectedIndex]!.value);
-      },
-      CTRL_C: () => term.exit(),
-    });
+    );
 
     render();
   });
-}
-
-/**
- * 選択UIの表示用テキスト配列を生成する
- */
-function buildSelectLines<T>(
-  prompt: string,
-  choices: Choice<T>[],
-  selectedIndex: number,
-): string[] {
-  const lines = [prompt];
-
-  choices.forEach((choice, i) => {
-    const isSelected = i === selectedIndex;
-
-    // 以前の絵文字ズレ対策を含めた実装
-    const marker = isSelected ? `${ANSI.COLOR.CYAN}  > ` : "    ";
-    const suffix = isSelected ? ANSI.COLOR.RESET : "";
-
-    lines.push(`${marker}${choice.label}${suffix}`);
-  });
-
-  return lines;
 }
