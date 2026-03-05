@@ -1,6 +1,7 @@
 - [x] `Cmd + V`(Pasete) で表示がバグる。
 - [x] `input.ts` の関数化
 - [ ] `spinner` を実装し、非同期関数の実行を待機できる。
-- [ ] `select` で、未定義項目の自由入力ができるようにする。
-- [ ] `slash command` と コマンドの auto complete
+- [ ] `select` で、未定義項目の自由入力ができるようなオプションを追加する。
+- [x] `slash command` と コマンドの auto complete
 - [ ] `input` の clear: Ctrl + C１回で現在の入力が消える。短い時間にもう１回押したらどうするかはアプリ側に任せ、コールバックを渡せるようにする。デフォルトではプロセスの終了。
+- [ ] `@path/to/file` で、デフォルトでworking directoryからのパス入力・ファイル指定ができるようにする

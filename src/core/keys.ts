@@ -6,6 +6,7 @@ export const KEYS = {
   RIGHT: "\u001b[C",
   ENTER: "\r",
   BACKSPACE: "\u007f",
+  TAB: "\u0009",
   SUBMIT: "\u000a", // Ctrl + J
 
   // Ctrl系 (同時押し)

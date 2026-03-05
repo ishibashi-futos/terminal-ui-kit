@@ -2,32 +2,53 @@ import { Terminal } from "../../core/terminal";
 import { type HistoryManager } from "../../utils/history";
 import { getDisplayWidth } from "../../utils/width";
 import {
+  buildSlashCommandHintLines,
   buildInputLines,
+  completeSlashCommand,
+  type InputCommand,
   normalizeInputChunk,
+  runSlashCommandCallback,
+  resolveSlashCommandState,
   resolveVerticalCursorMove,
 } from "./helpers";
+
+export interface InputOptions {
+  commands?: InputCommand[];
+}
 
 export async function input(
   prompt: string,
   history: HistoryManager,
+  options: InputOptions = {},
 ): Promise<string> {
   const term = new Terminal();
   const promptWidth: number = getDisplayWidth(prompt);
+  const commands = options.commands ?? [];
   let buffer: string = "";
   let cursorIndex = 0;
   let preferredColumn: number | null = null;
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const render = () => {
-      const { lines, cursorRow, cursorCol, totalRows } = buildInputLines(
+      const layout = buildInputLines(
         buffer,
         cursorIndex,
         prompt,
         promptWidth,
         term.getWidth(),
       );
+      const commandState = resolveSlashCommandState(
+        buffer,
+        cursorIndex,
+        commands,
+      );
+      const hintLines = commandState
+        ? buildSlashCommandHintLines(commandState.suggestions)
+        : [];
+      const lines = [...layout.lines, ...hintLines];
+      const totalRows = layout.totalRows + hintLines.length;
       term.update(lines, totalRows);
-      term.setCursorPosition(cursorRow, cursorCol, totalRows);
+      term.setCursorPosition(layout.cursorRow, layout.cursorCol, totalRows);
     };
 
     const resetVerticalPreference = () => {
@@ -67,7 +88,7 @@ export async function input(
 
     const cleanup = term.bindActions(
       {
-        SUBMIT: () => {
+        SUBMIT: async () => {
           if (!buffer) {
             return;
           }
@@ -77,6 +98,12 @@ export async function input(
           buffer = "";
           term.finalize();
           cleanup();
+          try {
+            await runSlashCommandCallback(result, commands);
+          } catch (error) {
+            reject(error);
+            return;
+          }
           resolve(result);
           return;
         },
@@ -129,6 +156,14 @@ export async function input(
           const chars = Array.from(buffer);
           chars.splice(cursorIndex, 0, "\n");
           applyBufferEdit(chars.join(""), cursorIndex + 1);
+        },
+        TAB: () => {
+          const result = completeSlashCommand(buffer, cursorIndex, commands);
+          if (!result.completed) {
+            return;
+          }
+
+          applyBufferEdit(result.buffer, result.cursorIndex);
         },
       },
       (char) => {
