@@ -29,7 +29,12 @@ import {
   type StickyStatusBar,
   type StickyStatusBarOptions,
 } from "./components/sticky-status-bar/component";
-import { HistoryManager } from "./utils/history";
+import {
+  HistoryManager,
+  type HistoryManagerOptions,
+  type HistorySnapshot,
+  type HistorySnapshotEntry,
+} from "./utils/history";
 import {
   notify,
   type NotifyOptions,
@@ -62,4 +67,7 @@ export type {
   StickyStatusBarOptions,
   WithSpinnerOptions,
   NotifyOptions,
+  HistorySnapshot,
+  HistorySnapshotEntry,
+  HistoryManagerOptions,
 };

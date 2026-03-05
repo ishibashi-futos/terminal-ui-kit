@@ -11,7 +11,14 @@ import {
 } from "../src/lib";
 
 // 実行例
-const history = new HistoryManager();
+const history = new HistoryManager({ maxEntries: 100 });
+history.deserialize({
+  version: 1,
+  entries: [
+    { seq: 10, text: "前回の入力A" },
+    { seq: 11, text: "前回の入力B" },
+  ],
+});
 while (true) {
   const selected = await select("お試しするアクションを選択してください", [
     { label: "✒️ 複数行入力(関数版)", value: "multi-line-input-fn" },
@@ -56,6 +63,10 @@ while (true) {
       });
       console.log("--- 送信内容 ---");
       console.log(result.value.trim());
+      console.log("--- 履歴エクスポート ---");
+      console.log(history.exportHistory());
+      console.log("--- 履歴シリアライズ ---");
+      console.log(history.serialize());
       console.log("--- 指定ファイル ---");
       console.log(result.paths);
       break;
