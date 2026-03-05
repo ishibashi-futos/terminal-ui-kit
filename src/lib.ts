@@ -1,5 +1,9 @@
 import { select } from "./components/select/component";
-import { type InputOptions, input } from "./components/input/component";
+import {
+  type InputOptions,
+  type InputResult,
+  input,
+} from "./components/input/component";
 import { type InputCommand } from "./components/input/helpers";
 import {
   printError,
@@ -31,6 +35,7 @@ export type {
   AsyncTaskEntry,
   InputCommand,
   InputOptions,
+  InputResult,
   SpinnerOptions,
   WithSpinnerOptions,
 };

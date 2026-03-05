@@ -1,4 +1,6 @@
 import { getDisplayWidth } from "../../utils/width";
+import { readdirSync, statSync, type Dirent } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 interface InputLayout {
   lines: string[]; // ターミナルに描画する行の配列
@@ -20,6 +22,13 @@ export interface InputCommand {
 
 export interface SlashCommandState {
   suggestions: InputCommand[];
+  replacementStart: number;
+  replacementEnd: number;
+  query: string;
+}
+
+interface MentionPathState {
+  suggestions: string[];
   replacementStart: number;
   replacementEnd: number;
   query: string;
@@ -278,6 +287,133 @@ interface CompletionResult {
   completed: boolean;
 }
 
+function toUnixPath(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
+function resolveMentionCandidates(
+  query: string,
+  cwd: string,
+  maxSuggestions: number,
+): string[] {
+  const normalizedQuery = toUnixPath(query);
+  const resolvedDirInput = normalizedQuery.endsWith("/")
+    ? normalizedQuery.slice(0, -1)
+    : dirname(normalizedQuery);
+  const dirInput = normalizedQuery.includes("/")
+    ? resolvedDirInput || "."
+    : ".";
+  const prefix = normalizedQuery.endsWith("/")
+    ? ""
+    : normalizedQuery.includes("/")
+      ? normalizedQuery.slice(normalizedQuery.lastIndexOf("/") + 1)
+      : normalizedQuery;
+
+  const baseDir = resolve(cwd, dirInput);
+  let entries: Dirent<string>[];
+  try {
+    entries = readdirSync(baseDir, { withFileTypes: true, encoding: "utf8" });
+  } catch {
+    return [];
+  }
+
+  const suggestions = entries
+    .filter((entry) => entry.name.startsWith(prefix))
+    .sort((a, b) => {
+      if (a.isDirectory() && !b.isDirectory()) {
+        return -1;
+      }
+      if (!a.isDirectory() && b.isDirectory()) {
+        return 1;
+      }
+      return a.name.localeCompare(b.name);
+    })
+    .map((entry) => {
+      const relative =
+        dirInput === "." ? entry.name : `${dirInput}/${entry.name}`;
+      return entry.isDirectory() ? `${relative}/` : relative;
+    });
+
+  return suggestions.slice(0, maxSuggestions);
+}
+
+function resolveMentionPathState(
+  buffer: string,
+  cursorIndex: number,
+  maxSuggestions: number = 5,
+  cwd: string = process.cwd(),
+): MentionPathState | null {
+  const beforeCursor = buffer.slice(0, cursorIndex);
+  const tokenStart =
+    Math.max(beforeCursor.lastIndexOf(" "), beforeCursor.lastIndexOf("\n")) + 1;
+  const tokenEndMatch = buffer.slice(cursorIndex).match(/[ \n]/);
+  const tokenEnd =
+    tokenEndMatch === null ? buffer.length : cursorIndex + tokenEndMatch.index!;
+  const token = buffer.slice(tokenStart, tokenEnd);
+
+  if (!token.startsWith("@")) {
+    return null;
+  }
+
+  const replacementStart = tokenStart + 1;
+  const replacementEnd = tokenEnd;
+  if (cursorIndex < replacementStart || cursorIndex > replacementEnd) {
+    return null;
+  }
+
+  const query = buffer.slice(replacementStart, cursorIndex);
+  const suggestions = resolveMentionCandidates(query, cwd, maxSuggestions);
+  if (suggestions.length === 0) {
+    return null;
+  }
+
+  return {
+    suggestions,
+    replacementStart,
+    replacementEnd,
+    query,
+  };
+}
+
+export function completeMentionPath(
+  buffer: string,
+  cursorIndex: number,
+  cwd: string = process.cwd(),
+): CompletionResult {
+  const state = resolveMentionPathState(buffer, cursorIndex, 5, cwd);
+  if (!state) {
+    return {
+      buffer,
+      cursorIndex,
+      completed: false,
+    };
+  }
+
+  const replacement =
+    state.suggestions.length === 1
+      ? (state.suggestions[0] ?? state.query)
+      : getSharedPrefix(state.suggestions);
+  if (replacement.length <= state.query.length) {
+    return {
+      buffer,
+      cursorIndex,
+      completed: false,
+    };
+  }
+
+  const nextBuffer =
+    buffer.slice(0, state.replacementStart) +
+    replacement +
+    buffer.slice(state.replacementEnd);
+  const nextCursorIndex = state.replacementStart + replacement.length;
+
+  return {
+    buffer: nextBuffer,
+    cursorIndex: nextCursorIndex,
+    completed: true,
+  };
+}
+
 export function completeSlashCommand(
   buffer: string,
   cursorIndex: number,
@@ -331,6 +467,29 @@ export function buildSlashCommandHintLines(commands: InputCommand[]): string[] {
   });
 }
 
+export function buildMentionPathHintLines(suggestions: string[]): string[] {
+  return suggestions.map((suggestion) => `  @${suggestion}`);
+}
+
+export function resolveMentionPathHints(
+  buffer: string,
+  cursorIndex: number,
+  maxSuggestions: number = 5,
+  cwd: string = process.cwd(),
+): string[] {
+  const state = resolveMentionPathState(
+    buffer,
+    cursorIndex,
+    maxSuggestions,
+    cwd,
+  );
+  if (!state) {
+    return [];
+  }
+
+  return state.suggestions;
+}
+
 interface ResolvedSubmittedCommand {
   command: InputCommand;
   args: string[];
@@ -379,4 +538,32 @@ export async function runSlashCommandCallback(
 
   await callback(resolved.args, input);
   return true;
+}
+
+export function extractMentionedFilePaths(
+  input: string,
+  cwd: string = process.cwd(),
+): string[] {
+  const matches = input.matchAll(/(?:^|[\s\n])@([^\s\n]+)/g);
+  const unique = new Set<string>();
+
+  for (const match of matches) {
+    const rawPath = match[1];
+    if (!rawPath) {
+      continue;
+    }
+
+    const filePath = toUnixPath(rawPath);
+    try {
+      const absolutePath = resolve(cwd, filePath);
+      const stat = statSync(absolutePath);
+      if (stat.isFile()) {
+        unique.add(filePath);
+      }
+    } catch {
+      // 存在しないパスは入力候補として無視する
+    }
+  }
+
+  return Array.from(unique);
 }

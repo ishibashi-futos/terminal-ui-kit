@@ -36,7 +36,9 @@ while (true) {
     case "multi-line-input-fn": {
       const result = await input("Prompt > ", history);
       console.log("--- 送信内容 ---");
-      console.log(result.trim());
+      console.log(result.value.trim());
+      console.log("--- 指定ファイル ---");
+      console.log(result.paths);
       break;
     }
     case "slash-command-sample": {
@@ -81,7 +83,9 @@ while (true) {
       });
 
       console.log("--- 送信内容 ---");
-      console.log(result.trim());
+      console.log(result.value.trim());
+      console.log("--- 指定ファイル ---");
+      console.log(result.paths);
       break;
     }
     case "exit": {

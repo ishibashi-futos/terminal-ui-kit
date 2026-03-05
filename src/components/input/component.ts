@@ -2,11 +2,15 @@ import { Terminal } from "../../core/terminal";
 import { type HistoryManager } from "../../utils/history";
 import { getDisplayWidth } from "../../utils/width";
 import {
+  buildMentionPathHintLines,
   buildSlashCommandHintLines,
   buildInputLines,
+  completeMentionPath,
   completeSlashCommand,
+  extractMentionedFilePaths,
   type InputCommand,
   normalizeInputChunk,
+  resolveMentionPathHints,
   runSlashCommandCallback,
   resolveSlashCommandState,
   resolveVerticalCursorMove,
@@ -16,11 +20,16 @@ export interface InputOptions {
   commands?: InputCommand[];
 }
 
+export interface InputResult {
+  value: string;
+  paths: string[];
+}
+
 export async function input(
   prompt: string,
   history: HistoryManager,
   options: InputOptions = {},
-): Promise<string> {
+): Promise<InputResult> {
   const term = new Terminal();
   const promptWidth: number = getDisplayWidth(prompt);
   const commands = options.commands ?? [];
@@ -42,9 +51,13 @@ export async function input(
         cursorIndex,
         commands,
       );
-      const hintLines = commandState
-        ? buildSlashCommandHintLines(commandState.suggestions)
-        : [];
+      const mentionSuggestions = resolveMentionPathHints(buffer, cursorIndex);
+      const hintLines =
+        mentionSuggestions.length > 0
+          ? buildMentionPathHintLines(mentionSuggestions)
+          : commandState
+            ? buildSlashCommandHintLines(commandState.suggestions)
+            : [];
       const lines = [...layout.lines, ...hintLines];
       const totalRows = layout.totalRows + hintLines.length;
       term.update(lines, totalRows);
@@ -94,6 +107,7 @@ export async function input(
           }
 
           const result = buffer;
+          const paths = extractMentionedFilePaths(result);
           history.add(result);
           buffer = "";
           term.finalize();
@@ -104,7 +118,7 @@ export async function input(
             reject(error);
             return;
           }
-          resolve(result);
+          resolve({ value: result, paths });
           return;
         },
         UP: () => {
@@ -158,12 +172,22 @@ export async function input(
           applyBufferEdit(chars.join(""), cursorIndex + 1);
         },
         TAB: () => {
-          const result = completeSlashCommand(buffer, cursorIndex, commands);
-          if (!result.completed) {
+          const mentionResult = completeMentionPath(buffer, cursorIndex);
+          if (mentionResult.completed) {
+            applyBufferEdit(mentionResult.buffer, mentionResult.cursorIndex);
             return;
           }
 
-          applyBufferEdit(result.buffer, result.cursorIndex);
+          const slashResult = completeSlashCommand(
+            buffer,
+            cursorIndex,
+            commands,
+          );
+          if (!slashResult.completed) {
+            return;
+          }
+
+          applyBufferEdit(slashResult.buffer, slashResult.cursorIndex);
         },
       },
       (char) => {

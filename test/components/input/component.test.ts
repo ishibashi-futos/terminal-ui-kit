@@ -1,10 +1,16 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import {
+  buildMentionPathHintLines,
   buildSlashCommandHintLines,
   buildInputLines,
+  completeMentionPath,
   completeSlashCommand,
+  extractMentionedFilePaths,
   normalizeInputChunk,
   runSlashCommandCallback,
+  resolveMentionPathHints,
   resolveSlashCommandState,
   resolveVerticalCursorMove,
 } from "../../../src/components/input/helpers";
@@ -119,6 +125,57 @@ describe("input helpers", () => {
         { name: "exit" },
       ]),
     ).toEqual(["  /help - ヘルプを表示", "  /exit"]);
+  });
+
+  test("@入力中に path 候補を取得できる", () => {
+    const cwd = mkdtempSync(join(process.cwd(), "tmp-input-"));
+    try {
+      mkdirSync(join(cwd, "src"));
+      writeFileSync(join(cwd, "README.md"), "ok");
+
+      expect(resolveMentionPathHints("@s", 2, 5, cwd)).toEqual(["src/"]);
+      expect(buildMentionPathHintLines(["src/", "README.md"])).toEqual([
+        "  @src/",
+        "  @README.md",
+      ]);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("@入力で Tab 補完できる", () => {
+    const cwd = mkdtempSync(join(process.cwd(), "tmp-input-"));
+    try {
+      mkdirSync(join(cwd, "src"));
+      writeFileSync(join(cwd, "src", "helpers.ts"), "ok");
+
+      const directoryCompleted = completeMentionPath("@s", 2, cwd);
+      expect(directoryCompleted.completed).toBe(true);
+      expect(directoryCompleted.buffer).toBe("@src/");
+      expect(directoryCompleted.cursorIndex).toBe(5);
+
+      const fileCompleted = completeMentionPath("@src/he", 7, cwd);
+      expect(fileCompleted.completed).toBe(true);
+      expect(fileCompleted.buffer).toBe("@src/helpers.ts");
+      expect(fileCompleted.cursorIndex).toBe(15);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("送信文字列から指定ファイルの path を抽出できる", () => {
+    const cwd = mkdtempSync(join(process.cwd(), "tmp-input-"));
+    try {
+      writeFileSync(join(cwd, "a.txt"), "a");
+      writeFileSync(join(cwd, "b.txt"), "b");
+      mkdirSync(join(cwd, "dir"));
+
+      expect(
+        extractMentionedFilePaths("確認 @a.txt と @b.txt と @dir", cwd),
+      ).toEqual(["a.txt", "b.txt"]);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 
   test("送信時に一致する slash command callback を実行できる", async () => {
