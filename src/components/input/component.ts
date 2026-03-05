@@ -185,7 +185,6 @@ export async function input(
           const result = buffer;
           const paths = extractMentionedFilePaths(result);
           history.add(result);
-          buffer = "";
           options.stickyStatusBar?.bar.clear();
           render(false);
           term.finalize();
