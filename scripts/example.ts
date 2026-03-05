@@ -6,7 +6,7 @@ import {
   printStatus,
   printToolCall,
   printError,
-} from "./lib";
+} from "../src/lib";
 
 // 実行例
 const history = new HistoryManager();
@@ -117,21 +117,21 @@ while (true) {
           {
             label: "設定ファイルを読み込み",
             task: async () => {
-              await Bun.sleep(500);
+              await Bun.sleep(1500);
               return "task-a";
             },
           },
           {
             label: "依存関係を解決",
             task: async () => {
-              await Bun.sleep(800);
+              await Bun.sleep(2000);
               return "task-b";
             },
           },
           {
             label: "キャッシュを検証",
             task: async () => {
-              await Bun.sleep(300);
+              await Bun.sleep(1000);
               return "task-c";
             },
           },
