@@ -6,6 +6,7 @@ import {
   printStatus,
   printToolCall,
   printError,
+  createStickyStatusBar,
 } from "../src/lib";
 
 // 実行例
@@ -28,6 +29,10 @@ while (true) {
     {
       label: "🖨️ status/log/error 表示サンプル",
       value: "display-api-sample",
+    },
+    {
+      label: "📌 Sticky Status Bar サンプル",
+      value: "sticky-status-bar-sample",
     },
     {
       label: "📝 select + 自由入力サンプル",
@@ -165,6 +170,44 @@ while (true) {
         },
       );
       console.log(`[select-custom-input] result=${plan}`);
+      break;
+    }
+    case "sticky-status-bar-sample": {
+      const stickyBar = createStickyStatusBar();
+
+      const inputResult = await input("Prompt > ", history, {
+        stickyStatusBar: {
+          bar: stickyBar,
+          render: ({ buffer }) =>
+            buffer.length === 0 ? "" : `Input length: ${buffer.length} chars`,
+        },
+      });
+      console.log(`[sticky-input] value=${inputResult.value.trim()}`);
+
+      const selected = await select(
+        "次のアクションを選択してください",
+        [
+          { label: "Build", value: "build" },
+          { label: "Test", value: "test" },
+          { label: "Deploy", value: "deploy" },
+        ],
+        {
+          allowCustomInput: true,
+          stickyStatusBar: {
+            bar: stickyBar,
+            render: ({ selectedLabel, isCustomInputSelected, customInput }) => {
+              if (isCustomInputSelected) {
+                return customInput.length === 0
+                  ? "Custom input is empty"
+                  : `Custom input: ${customInput}`;
+              }
+
+              return `Selected: ${selectedLabel}`;
+            },
+          },
+        },
+      );
+      console.log(`[sticky-select] result=${selected}`);
       break;
     }
   }

@@ -1,5 +1,6 @@
 import { ANSI } from "../../core/ansi";
 import { getDisplayWidth } from "../../utils/width";
+import { type StickyStatusBar } from "../sticky-status-bar/component";
 
 export interface Choice<T = string> {
   label: string;
@@ -9,6 +10,18 @@ export interface Choice<T = string> {
 export interface SelectOptions {
   allowCustomInput?: boolean;
   customInputLabel?: string;
+  stickyStatusBar?: {
+    bar: StickyStatusBar;
+    render: (state: SelectStickyStatusState) => string;
+  };
+}
+
+export interface SelectStickyStatusState {
+  selectedIndex: number;
+  selectedLabel: string;
+  isCustomInputSelected: boolean;
+  customInput: string;
+  terminalWidth: number;
 }
 
 export interface RenderLayout {

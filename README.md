@@ -12,4 +12,4 @@ Simple Terminal UI Kit
 - [x] Slash Command / Auto Complete による、安全なコード実行
 - [x] History管理で、過去の入力を再送信可能
 - [ ] Table / Graph表示
-- [ ] Sticky Status Bar
+- [x] Sticky Status Bar

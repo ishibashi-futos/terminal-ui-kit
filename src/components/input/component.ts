@@ -1,4 +1,5 @@
 import { Terminal } from "../../core/terminal";
+import { type StickyStatusBar } from "../sticky-status-bar/component";
 import { type HistoryManager } from "../../utils/history";
 import { getDisplayWidth } from "../../utils/width";
 import {
@@ -20,11 +21,21 @@ export interface InputOptions {
   commands?: InputCommand[];
   onDoubleCtrlC?: () => void | Promise<void>;
   doubleCtrlCThresholdMs?: number;
+  stickyStatusBar?: {
+    bar: StickyStatusBar;
+    render: (state: InputStickyStatusState) => string;
+  };
 }
 
 export interface InputResult {
   value: string;
   paths: string[];
+}
+
+export interface InputStickyStatusState {
+  buffer: string;
+  cursorIndex: number;
+  terminalWidth: number;
 }
 
 export async function input(
@@ -50,13 +61,14 @@ export async function input(
   let doubleCtrlCHintTimer: ReturnType<typeof setTimeout> | null = null;
 
   return new Promise((resolve, reject) => {
-    const render = () => {
+    const render = (withStickyBar = true) => {
+      const terminalWidth = term.getWidth();
       const layout = buildInputLines(
         buffer,
         cursorIndex,
         prompt,
         promptWidth,
-        term.getWidth(),
+        terminalWidth,
       );
       const commandState = resolveSlashCommandState(
         buffer,
@@ -78,7 +90,21 @@ export async function input(
         hintLines.push(`  ${doubleCtrlCHintMessage}`);
       }
       const lines = [...layout.lines, ...hintLines];
-      const totalRows = layout.totalRows + hintLines.length;
+      let stickyRows = 0;
+      const stickyStatusBar = options.stickyStatusBar;
+      if (withStickyBar && stickyStatusBar) {
+        stickyStatusBar.bar.setText(
+          stickyStatusBar.render({
+            buffer,
+            cursorIndex,
+            terminalWidth,
+          }),
+        );
+        const stickyLine = stickyStatusBar.bar.renderLine(terminalWidth);
+        lines.push(stickyLine ?? "");
+        stickyRows = 1;
+      }
+      const totalRows = layout.totalRows + hintLines.length + stickyRows;
       term.update(lines, totalRows);
       term.setCursorPosition(layout.cursorRow, layout.cursorCol, totalRows);
     };
@@ -153,6 +179,8 @@ export async function input(
           const paths = extractMentionedFilePaths(result);
           history.add(result);
           buffer = "";
+          options.stickyStatusBar?.bar.clear();
+          render(false);
           term.finalize();
           cleanup();
           try {
@@ -246,6 +274,8 @@ export async function input(
 
           if (isDoublePressed) {
             cleanup();
+            options.stickyStatusBar?.bar.clear();
+            render(false);
             term.finalize();
             try {
               await onDoubleCtrlC();

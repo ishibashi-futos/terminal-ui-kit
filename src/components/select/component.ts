@@ -5,11 +5,17 @@ import {
   normalizeSelectInputChunk,
   type Choice,
   type SelectOptions,
+  type SelectStickyStatusState,
 } from "./helpers";
 
-export type { Choice, SelectOptions };
+export type { Choice, SelectOptions, SelectStickyStatusState };
 
 export function select<T>(prompt: string, choices: Choice<T>[]): Promise<T>;
+export function select<T>(
+  prompt: string,
+  choices: Choice<T>[],
+  options: SelectOptions,
+): Promise<T | string>;
 export function select<T>(
   prompt: string,
   choices: Choice<T>[],
@@ -28,7 +34,7 @@ export function select<T>(
   return new Promise((resolve) => {
     const isCustomSelected = () => items[selectedIndex]?.type === "custom";
 
-    const render = () => {
+    const render = (withStickyBar = true) => {
       const terminalWidth = term.getWidth();
       const layout = buildSelectLines(
         prompt,
@@ -37,7 +43,29 @@ export function select<T>(
         terminalWidth,
         customInput,
       );
-      term.update(layout.lines, layout.totalRows);
+      const lines = [...layout.lines];
+      let stickyRows = 0;
+      const stickyStatusBar = options.stickyStatusBar;
+      if (withStickyBar && stickyStatusBar) {
+        const selectedItem = items[selectedIndex];
+        const selectedLabel =
+          selectedItem?.type === "choice"
+            ? selectedItem.choice.label
+            : (selectedItem?.label ?? "");
+        stickyStatusBar.bar.setText(
+          stickyStatusBar.render({
+            selectedIndex,
+            selectedLabel,
+            isCustomInputSelected: isCustomSelected(),
+            customInput,
+            terminalWidth,
+          }),
+        );
+        const stickyLine = stickyStatusBar.bar.renderLine(terminalWidth);
+        lines.push(stickyLine ?? "");
+        stickyRows = 1;
+      }
+      term.update(lines, layout.totalRows + stickyRows);
     };
 
     const cleanup = term.bindActions(
@@ -65,12 +93,16 @@ export function select<T>(
           }
 
           if (selectedItem.type === "custom") {
+            options.stickyStatusBar?.bar.clear();
+            render(false);
             cleanup();
             term.finalize();
             resolve(customInput.trim());
             return;
           }
 
+          options.stickyStatusBar?.bar.clear();
+          render(false);
           cleanup();
           term.finalize();
           resolve(selectedItem.choice.value);
