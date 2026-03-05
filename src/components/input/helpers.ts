@@ -129,6 +129,8 @@ interface VerticalMoveResult {
   preferredColumn: number;
 }
 
+export type LineJumpDirection = "start" | "end";
+
 export function getCursorLinePosition(
   buffer: string,
   cursorIndex: number,
@@ -191,6 +193,24 @@ export function resolveVerticalCursorMove(
     cursorIndex: (lineStarts[targetLineIndex] ?? 0) + targetColumn,
     preferredColumn: baseColumn,
   };
+}
+
+export function resolveLineJumpCursorIndex(
+  buffer: string,
+  cursorIndex: number,
+  direction: LineJumpDirection,
+): number {
+  const { currentLineIndex, lineStarts, rawLines } = getCursorLinePosition(
+    buffer,
+    cursorIndex,
+  );
+  const lineStart = lineStarts[currentLineIndex] ?? 0;
+  if (direction === "start") {
+    return lineStart;
+  }
+
+  const lineLength = rawLines[currentLineIndex]?.length ?? 0;
+  return lineStart + lineLength;
 }
 
 export function normalizeInputChunk(chunk: string): string {

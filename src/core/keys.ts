@@ -4,6 +4,10 @@ export const KEYS = {
   DOWN: "\u001b[B",
   LEFT: "\u001b[D",
   RIGHT: "\u001b[C",
+  HOME: "\u001b[H",
+  END: "\u001b[F",
+  HOME_APP: "\u001bOH",
+  END_APP: "\u001bOF",
   ENTER: "\r",
   BACKSPACE: "\u007f",
   TAB: "\u0009",
@@ -11,6 +15,8 @@ export const KEYS = {
 
   // Ctrl系 (同時押し)
   CTRL_C: "\u0003",
+  CTRL_A: "\u0001",
+  CTRL_E: "\u0005",
   CTRL_R: "\u0012", // 履歴検索などに
 
   // Alt系 (同時押し)

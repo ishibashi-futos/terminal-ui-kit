@@ -12,6 +12,7 @@ import {
   type InputCommand,
   normalizeInputChunk,
   resolveMentionPathHints,
+  resolveLineJumpCursorIndex,
   runSlashCommandCallback,
   resolveSlashCommandState,
   resolveVerticalCursorMove,
@@ -149,6 +150,12 @@ export async function input(
       preferredColumn = moved.preferredColumn;
       return true;
     };
+    const moveCursorLineBoundary = (direction: "start" | "end") => {
+      resetDoubleCtrlCWindow();
+      cursorIndex = resolveLineJumpCursorIndex(buffer, cursorIndex, direction);
+      resetVerticalPreference();
+      render();
+    };
 
     const applyHistoryBuffer = (nextBuffer: string) => {
       resetDoubleCtrlCWindow();
@@ -233,6 +240,24 @@ export async function input(
             resetVerticalPreference();
             render();
           }
+        },
+        HOME: () => {
+          moveCursorLineBoundary("start");
+        },
+        HOME_APP: () => {
+          moveCursorLineBoundary("start");
+        },
+        END: () => {
+          moveCursorLineBoundary("end");
+        },
+        END_APP: () => {
+          moveCursorLineBoundary("end");
+        },
+        CTRL_A: () => {
+          moveCursorLineBoundary("start");
+        },
+        CTRL_E: () => {
+          moveCursorLineBoundary("end");
         },
         BACKSPACE: () => {
           resetDoubleCtrlCWindow();
