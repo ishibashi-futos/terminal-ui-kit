@@ -29,12 +29,13 @@ export interface WithSpinnerOptions extends SpinnerOptions {
   failureText?: string;
   waitingMark?: string;
   runningMark?: string;
+  timeoutMs?: number;
 }
 
 export type AsyncTask<T> = () => Promise<T>;
 
 export interface AsyncTaskEntry<T> {
-  label: string;
+  label?: string;
   task: AsyncTask<T>;
 }
 
@@ -46,6 +47,7 @@ const DEFAULT_SUCCESS_MARK = "✔";
 const DEFAULT_FAILURE_MARK = "✖";
 const DEFAULT_WAITING_MARK = "…";
 const DEFAULT_RUNNING_MARK = ">";
+const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 
 export class Spinner {
   private readonly intervalMs: number;
@@ -142,6 +144,10 @@ class TaskProgressSpinner {
   private readonly setIntervalFn: SetIntervalFn;
   private readonly clearIntervalFn: ClearIntervalFn;
   private readonly taskLabels: string[];
+  private readonly taskStateDisplay: Record<
+    TaskState,
+    { mark: string; text: string }
+  >;
 
   private frameIndex = 0;
   private timer: IntervalHandle | null = null;
@@ -167,6 +173,12 @@ class TaskProgressSpinner {
     this.setIntervalFn = dependencies.setIntervalFn ?? setInterval;
     this.clearIntervalFn = dependencies.clearIntervalFn ?? clearInterval;
     this.taskLabels = taskLabels;
+    this.taskStateDisplay = {
+      waiting: { mark: this.waitingMark, text: "waiting" },
+      running: { mark: this.runningMark, text: "running" },
+      success: { mark: this.successMark, text: "done" },
+      failure: { mark: this.failureMark, text: "failed" },
+    };
     this.taskStates = taskLabels.map(() => "waiting");
   }
 
@@ -225,44 +237,11 @@ class TaskProgressSpinner {
     const lines: string[] = [];
     for (let index = 0; index < this.taskLabels.length; index += 1) {
       const state = this.taskStates[index] ?? "waiting";
-      const label = this.taskLabels[index] ?? `タスク${index + 1}`;
-      lines.push(
-        `${this.resolveMark(state)} ${label} (${this.resolveStateText(state)})`,
-      );
+      const label = this.taskLabels[index] ?? `Task ${index + 1}`;
+      const display = this.taskStateDisplay[state];
+      lines.push(`${display.mark} ${label} (${display.text})`);
     }
     return lines;
-  }
-
-  private resolveMark(state: TaskState): string {
-    if (state === "success") {
-      return this.successMark;
-    }
-
-    if (state === "failure") {
-      return this.failureMark;
-    }
-
-    if (state === "running") {
-      return this.runningMark;
-    }
-
-    return this.waitingMark;
-  }
-
-  private resolveStateText(state: TaskState): string {
-    if (state === "success") {
-      return "完了";
-    }
-
-    if (state === "failure") {
-      return "失敗";
-    }
-
-    if (state === "running") {
-      return "実行中";
-    }
-
-    return "待機中";
   }
 
   private render(lines: string[]) {
@@ -289,12 +268,45 @@ function normalizeTaskEntries<T>(
   const first = taskOrEntries[0];
   if (typeof first === "function") {
     return (taskOrEntries as AsyncTask<T>[]).map((task, index) => ({
-      label: `タスク${index + 1}`,
+      label: `Task ${index + 1}`,
       task,
     }));
   }
 
-  return taskOrEntries as AsyncTaskEntry<T>[];
+  return (taskOrEntries as AsyncTaskEntry<T>[]).map((entry, index) => ({
+    task: entry.task,
+    label: entry.label ?? `Task ${index + 1}`,
+  }));
+}
+
+function resolveFailureMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.length > 0) {
+    return error.message;
+  }
+  return fallback;
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error(`${message} timed out (${timeoutMs}ms)`));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
 }
 
 export async function withSpinner<T>(
@@ -320,31 +332,45 @@ export async function withSpinner<T>(
   taskOrTasks: AsyncTask<T> | AsyncTask<T>[] | AsyncTaskEntry<T>[],
   options: WithSpinnerOptions = {},
 ): Promise<T | T[]> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
   if (Array.isArray(taskOrTasks)) {
     const entries = normalizeTaskEntries(taskOrTasks);
     const taskSpinner = new TaskProgressSpinner(
       message,
-      entries.map((entry) => entry.label),
+      entries.map((entry, index) => entry.label ?? `Task ${index + 1}`),
       options,
     );
 
     taskSpinner.start();
 
     const results: T[] = new Array(entries.length);
-    const settled = await Promise.allSettled(
-      entries.map(async (entry, index) => {
-        taskSpinner.markRunning(index);
-        try {
-          const result = await entry.task();
-          results[index] = result;
-          taskSpinner.markSuccess(index);
-          return result;
-        } catch (error) {
-          taskSpinner.markFailure(index);
-          throw error;
-        }
-      }),
-    );
+    let settled: PromiseSettledResult<T>[];
+    try {
+      settled = await withTimeout(
+        Promise.allSettled(
+          entries.map(async (entry, index) => {
+            taskSpinner.markRunning(index);
+            try {
+              const result = await entry.task();
+              results[index] = result;
+              taskSpinner.markSuccess(index);
+              return result;
+            } catch (error) {
+              taskSpinner.markFailure(index);
+              throw error;
+            }
+          }),
+        ),
+        timeoutMs,
+        message,
+      );
+    } catch (error) {
+      taskSpinner.fail(
+        options.failureText ?? resolveFailureMessage(error, message),
+      );
+      throw error;
+    }
 
     const rejected = settled.find(
       (item): item is PromiseRejectedResult => item.status === "rejected",
@@ -363,11 +389,11 @@ export async function withSpinner<T>(
   spinner.start();
 
   try {
-    const result = await taskOrTasks();
+    const result = await withTimeout(taskOrTasks(), timeoutMs, message);
     spinner.succeed(options.successText ?? message);
     return result;
   } catch (error) {
-    spinner.fail(options.failureText ?? message);
+    spinner.fail(options.failureText ?? resolveFailureMessage(error, message));
     throw error;
   }
 }

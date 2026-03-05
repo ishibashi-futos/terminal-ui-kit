@@ -137,6 +137,20 @@ describe("withSpinner", () => {
     expect(result).toEqual(["A", "B"]);
   });
 
+  test("ラベル未指定のタスク配列でも結果を返せる", async () => {
+    const result = await withSpinner("実行", [
+      {
+        task: async () => "A",
+      },
+      {
+        label: "タスクB",
+        task: async () => "B",
+      },
+    ]);
+
+    expect(result).toEqual(["A", "B"]);
+  });
+
   test("失敗時は fail 表示して例外を再送出する", async () => {
     let failMessage = "";
     const originalFail = Spinner.prototype.fail;
@@ -162,5 +176,34 @@ describe("withSpinner", () => {
     } finally {
       Spinner.prototype.fail = originalFail;
     }
+  });
+
+  test("単一タスクはタイムアウト時間を超えると失敗する", async () => {
+    await expect(
+      withSpinner(
+        "実行",
+        async () =>
+          new Promise<number>(() => {
+            return;
+          }),
+        { timeoutMs: 10 },
+      ),
+    ).rejects.toThrow("timed out");
+  });
+
+  test("複数タスクはタイムアウト時間を超えると失敗する", async () => {
+    await expect(
+      withSpinner(
+        "実行",
+        [
+          async () => "A",
+          async () =>
+            new Promise<string>(() => {
+              return;
+            }),
+        ],
+        { timeoutMs: 10 },
+      ),
+    ).rejects.toThrow("timed out");
   });
 });
