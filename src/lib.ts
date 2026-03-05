@@ -30,6 +30,10 @@ import {
   type StickyStatusBarOptions,
 } from "./components/sticky-status-bar/component";
 import { HistoryManager } from "./utils/history";
+import {
+  notify,
+  type NotifyOptions,
+} from "./components/notification/component";
 
 export {
   select,
@@ -41,6 +45,7 @@ export {
   printToolCall,
   printError,
   createStickyStatusBar,
+  notify,
 };
 export type {
   AsyncTask,
@@ -56,4 +61,5 @@ export type {
   StickyStatusBar,
   StickyStatusBarOptions,
   WithSpinnerOptions,
+  NotifyOptions,
 };

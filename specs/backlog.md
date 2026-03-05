@@ -5,4 +5,5 @@
 - [x] `slash command` と コマンドの auto complete
 - [x] `input` の clear: Ctrl + C１回で現在の入力バッファをクリアする。短い時間にもう１回押したらどうするかはアプリ側に任せ、コールバックを渡せるようにする。デフォルトではプロセスの終了。
 - [x] `input` の 途中で、 `@`から始まる入力では `@path/to/file` で、デフォルトでworking directoryからのパス入力・ファイル指定ができるようにする。指定されたファイルは、戻り値でパスを返せるようにする。
-- [ ] inputでのHome / End などのジャンプキー操作への対応
+- [x] inputでのHome / End などのジャンプキー操作への対応
+- [x] クロスプラットフォームのOS通知. Windows: pwsh.exe, macOS: osascript

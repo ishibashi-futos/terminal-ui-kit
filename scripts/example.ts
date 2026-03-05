@@ -7,6 +7,7 @@ import {
   printToolCall,
   printError,
   createStickyStatusBar,
+  notify,
 } from "../src/lib";
 
 // 実行例
@@ -37,6 +38,10 @@ while (true) {
     {
       label: "📝 select + 自由入力サンプル",
       value: "select-custom-input-sample",
+    },
+    {
+      label: "🔔 OS通知サンプル",
+      value: "os-notification-sample",
     },
     { label: "❌ 終了", value: "exit" },
   ]);
@@ -208,6 +213,14 @@ while (true) {
         },
       );
       console.log(`[sticky-select] result=${selected}`);
+      break;
+    }
+    case "os-notification-sample": {
+      const notified = await notify(
+        "terminal-ui-kit",
+        "OS notification sample message",
+      );
+      console.log(`[os-notification] success=${notified}`);
       break;
     }
   }
