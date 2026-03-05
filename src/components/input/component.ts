@@ -1,7 +1,11 @@
 import { Terminal } from "../../core/terminal";
 import { type HistoryManager } from "../../utils/history";
 import { getDisplayWidth } from "../../utils/width";
-import { buildInputLines, resolveVerticalCursorMove } from "./helpers";
+import {
+  buildInputLines,
+  normalizeInputChunk,
+  resolveVerticalCursorMove,
+} from "./helpers";
 
 export async function input(
   prompt: string,
@@ -128,9 +132,17 @@ export async function input(
         },
       },
       (char) => {
+        const normalized = normalizeInputChunk(char);
+        if (!normalized) {
+          return;
+        }
+
         const chars = Array.from(buffer);
-        chars.splice(cursorIndex, 0, char);
-        applyBufferEdit(chars.join(""), cursorIndex + char.length);
+        chars.splice(cursorIndex, 0, normalized);
+        applyBufferEdit(
+          chars.join(""),
+          cursorIndex + Array.from(normalized).length,
+        );
         return;
       },
     );

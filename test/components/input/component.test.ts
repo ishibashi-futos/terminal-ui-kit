@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildInputLines,
+  normalizeInputChunk,
   resolveVerticalCursorMove,
 } from "../../../src/components/input/helpers";
 import { getDisplayWidth } from "../../../src/utils/width";
@@ -60,6 +61,11 @@ describe("input helpers", () => {
     expect(layout.cursorRow).toBe(2);
     expect(layout.cursorCol).toBe(10);
     expect(layout.totalRows).toBe(3);
+  });
+
+  test("貼り付けチャンクの制御シーケンスと改行コードを正規化できる", () => {
+    const pasted = "\u001b[200~line1\r\nline2\rline3\u001b[201~";
+    expect(normalizeInputChunk(pasted)).toBe("line1\nline2\nline3");
   });
 });
 

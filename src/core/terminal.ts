@@ -3,6 +3,8 @@ import { KEYS, type KeyName } from "./keys";
 type KeyHandler = (chunk: string) => unknown;
 type stdin = typeof process.stdin;
 type stdout = typeof process.stdout;
+const BRACKETED_PASTE_START = "\u001b[200~";
+const BRACKETED_PASTE_END = "\u001b[201~";
 
 export class Terminal {
   private handlers: Map<string, KeyHandler> = new Map();
@@ -18,6 +20,14 @@ export class Terminal {
     const handler = this.handlers.get(chunk);
     if (handler) {
       handler(chunk);
+      return;
+    }
+
+    const bracketedPaste = this.extractBracketedPaste(chunk);
+    if (bracketedPaste !== null) {
+      if (this.onAnyCharHandler) {
+        this.onAnyCharHandler(bracketedPaste);
+      }
       return;
     }
 
@@ -39,6 +49,16 @@ export class Terminal {
     this.stdin.setEncoding("utf8");
 
     this.stdin.on("data", this.handler);
+  }
+
+  private extractBracketedPaste(chunk: string): string | null {
+    if (!chunk.includes(BRACKETED_PASTE_START)) {
+      return null;
+    }
+
+    return chunk
+      .replaceAll(BRACKETED_PASTE_START, "")
+      .replaceAll(BRACKETED_PASTE_END, "");
   }
 
   bindActions(
