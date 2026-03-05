@@ -32,4 +32,4 @@ AIエージェントツール/対話型の CLI を想定した、`Zero external 
 ## Definition of Done
 
 - `scripts/sanity.sh` を実行し、型エラー・フォーマット・全件テストが全てパスすること
-- 新規APIの場合は、 `src/cli.ts` にサンプル実装を追加する
+- 新規APIの場合は、 `scripts/example.ts` にサンプル実装を追加する
