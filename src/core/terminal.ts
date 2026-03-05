@@ -12,14 +12,14 @@ export class Terminal {
   private lastLines = 0;
   private currentCursorRow = 0;
   private handler = (chunk: string) => {
-    if (chunk === KEYS.CTRL_C) {
-      this.exit();
-      return;
-    }
-
     const handler = this.handlers.get(chunk);
     if (handler) {
       handler(chunk);
+      return;
+    }
+
+    if (chunk === KEYS.CTRL_C) {
+      this.exit();
       return;
     }
 

@@ -34,7 +34,12 @@ while (true) {
 
   switch (selected) {
     case "multi-line-input-fn": {
-      const result = await input("Prompt > ", history);
+      const result = await input("Prompt > ", history, {
+        onDoubleCtrlC: () => {
+          console.log("Ctrl + C が短時間に2回押されたため終了します");
+          process.exit(0);
+        },
+      });
       console.log("--- 送信内容 ---");
       console.log(result.value.trim());
       console.log("--- 指定ファイル ---");

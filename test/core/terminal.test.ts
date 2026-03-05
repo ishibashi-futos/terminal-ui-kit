@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ANSI } from "../../src/core/ansi";
+import { KEYS } from "../../src/core/keys";
 import { Terminal } from "../../src/core/terminal";
 
 interface FakeStdin {
@@ -75,6 +76,48 @@ describe("Terminal", () => {
     stdin.emitData("\u001b[200~line1\r\nline2\u001b[201~");
 
     expect(received).toBe("line1\r\nline2");
+    cleanup();
+  });
+
+  test("CTRL_C が登録されている場合は exit せずにハンドラを実行できる", () => {
+    const stdin = createFakeStdin();
+    const stdout: FakeStdout = { write() {} };
+    const term = new Terminal(stdin as never, stdout as never);
+    let exited = false;
+    let handled = false;
+
+    term.exit = () => {
+      exited = true;
+    };
+
+    const cleanup = term.bindActions({
+      CTRL_C: () => {
+        handled = true;
+      },
+    });
+
+    stdin.emitData(KEYS.CTRL_C);
+
+    expect(handled).toBe(true);
+    expect(exited).toBe(false);
+    cleanup();
+  });
+
+  test("CTRL_C が未登録の場合は既定の exit が呼ばれる", () => {
+    const stdin = createFakeStdin();
+    const stdout: FakeStdout = { write() {} };
+    const term = new Terminal(stdin as never, stdout as never);
+    let exited = false;
+
+    term.exit = () => {
+      exited = true;
+    };
+
+    const cleanup = term.bindActions({});
+
+    stdin.emitData(KEYS.CTRL_C);
+
+    expect(exited).toBe(true);
     cleanup();
   });
 });
