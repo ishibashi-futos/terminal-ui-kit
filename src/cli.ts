@@ -1,4 +1,12 @@
-import { select, input, withSpinner, HistoryManager } from "./lib";
+import {
+  select,
+  input,
+  withSpinner,
+  HistoryManager,
+  printStatus,
+  printToolCall,
+  printError,
+} from "./lib";
 
 // 実行例
 const history = new HistoryManager();
@@ -16,6 +24,10 @@ while (true) {
     {
       label: "⏳ Spinner + 非同期待機サンプル(複数タスク)",
       value: "spinner-sample-multiple",
+    },
+    {
+      label: "🖨️ status/log/error 表示サンプル",
+      value: "display-api-sample",
     },
     { label: "❌ 終了", value: "exit" },
   ]);
@@ -117,6 +129,13 @@ while (true) {
       );
 
       console.log(`[multiple] result=${multipleResults.join(", ")}`);
+      break;
+    }
+    case "display-api-sample": {
+      printStatus("セッションを初期化しています");
+      printToolCall("read_file", { path: "./README.md" });
+      printToolCall("exec", "bun test");
+      printError("テスト実行に失敗しました");
       break;
     }
   }
