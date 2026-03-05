@@ -1,4 +1,4 @@
-import { select, input, HistoryManager } from "./lib";
+import { select, input, withSpinner, HistoryManager } from "./lib";
 
 // 実行例
 const history = new HistoryManager();
@@ -8,6 +8,14 @@ while (true) {
     {
       label: "🧭 Slash Command + 補完サンプル",
       value: "slash-command-sample",
+    },
+    {
+      label: "⏳ Spinner + 非同期待機サンプル(単一タスク)",
+      value: "spinner-sample",
+    },
+    {
+      label: "⏳ Spinner + 非同期待機サンプル(複数タスク)",
+      value: "spinner-sample-multiple",
     },
     { label: "❌ 終了", value: "exit" },
   ]);
@@ -67,6 +75,49 @@ while (true) {
     case "exit": {
       console.log("--- 終了が選択されました ---");
       process.exit(0);
+    }
+    case "spinner-sample": {
+      const singleResult = await withSpinner("単一タスクを実行中", async () => {
+        await Bun.sleep(900);
+        return "single-done";
+      });
+
+      console.log(`[single] result=${singleResult}`);
+      break;
+    }
+    case "spinner-sample-multiple": {
+      const multipleResults = await withSpinner(
+        "複数タスクを並列実行中",
+        [
+          {
+            label: "設定ファイルを読み込み",
+            task: async () => {
+              await Bun.sleep(500);
+              return "task-a";
+            },
+          },
+          {
+            label: "依存関係を解決",
+            task: async () => {
+              await Bun.sleep(800);
+              return "task-b";
+            },
+          },
+          {
+            label: "キャッシュを検証",
+            task: async () => {
+              await Bun.sleep(300);
+              return "task-c";
+            },
+          },
+        ],
+        {
+          successText: "複数タスク完了",
+        },
+      );
+
+      console.log(`[multiple] result=${multipleResults.join(", ")}`);
+      break;
     }
   }
 }

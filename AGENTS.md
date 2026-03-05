@@ -27,3 +27,7 @@ AIエージェントツール/対話型の CLI を想定した、`Zero external 
   - `core/` - 内部用のコアライブラリ
   - `utils/` - ユーティリティ関数
 - `@test/` - テストコードを格納する
+
+## Definition of Done
+
+- `scripts/sanity.sh` を実行し、型エラー・フォーマット・全件テストが全てパスすること
