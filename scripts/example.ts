@@ -69,6 +69,8 @@ while (true) {
       console.log(history.serialize());
       console.log("--- 指定ファイル ---");
       console.log(result.paths);
+      console.log("--- 指定メンション ---");
+      console.log(result.mentions);
       break;
     }
     case "slash-command-sample": {
@@ -116,6 +118,8 @@ while (true) {
       console.log(result.value.trim());
       console.log("--- 指定ファイル ---");
       console.log(result.paths);
+      console.log("--- 指定メンション ---");
+      console.log(result.mentions);
       break;
     }
     case "exit": {

@@ -10,7 +10,11 @@ import {
   type InputStickyStatusState,
   input,
 } from "./components/input/component";
-import { type InputCommand } from "./components/input/helpers";
+import {
+  type InputCommand,
+  type InputMention,
+  type InputMentionError,
+} from "./components/input/helpers";
 import {
   printError,
   printStatus,
@@ -56,6 +60,8 @@ export type {
   AsyncTask,
   AsyncTaskEntry,
   InputCommand,
+  InputMention,
+  InputMentionError,
   InputStickyStatusState,
   InputOptions,
   InputResult,

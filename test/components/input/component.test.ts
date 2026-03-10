@@ -7,6 +7,7 @@ import {
   buildInputLines,
   completeMentionPath,
   completeSlashCommand,
+  extractMentionedFiles,
   extractMentionedFilePaths,
   normalizeInputChunk,
   resolveLineJumpCursorIndex,
@@ -176,6 +177,26 @@ describe("input helpers", () => {
     }
   });
 
+  test("@path:range では : より後ろで path 候補を出さない", () => {
+    const cwd = mkdtempSync(join(process.cwd(), "tmp-input-"));
+    try {
+      mkdirSync(join(cwd, "src"));
+      writeFileSync(join(cwd, "src", "helpers.ts"), "ok");
+
+      expect(resolveMentionPathHints("@src/he:1-10", 7, 5, cwd)).toEqual([
+        "src/helpers.ts",
+      ]);
+      expect(resolveMentionPathHints("@src/he:1-10", 11, 5, cwd)).toEqual([]);
+
+      const completed = completeMentionPath("@src/he:1-10", 7, cwd);
+      expect(completed.completed).toBe(true);
+      expect(completed.buffer).toBe("@src/helpers.ts:1-10");
+      expect(completed.cursorIndex).toBe(15);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
   test("送信文字列から指定ファイルの path を抽出できる", () => {
     const cwd = mkdtempSync(join(process.cwd(), "tmp-input-"));
     try {
@@ -184,8 +205,127 @@ describe("input helpers", () => {
       mkdirSync(join(cwd, "dir"));
 
       expect(
-        extractMentionedFilePaths("確認 @a.txt と @b.txt と @dir", cwd),
+        extractMentionedFilePaths(
+          "確認 @a.txt と @b.txt:2-3 と @a.txt:10-1 と @dir",
+          cwd,
+        ),
       ).toEqual(["a.txt", "b.txt"]);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("送信文字列から指定ファイルの内容を抽出できる", () => {
+    const cwd = mkdtempSync(join(process.cwd(), "tmp-input-"));
+    try {
+      writeFileSync(
+        join(cwd, "a.txt"),
+        Array.from({ length: 105 }, (_, index) => `line-${index + 1}`).join(
+          "\n",
+        ),
+      );
+      writeFileSync(join(cwd, "b.txt"), "a\nb\nc\nd");
+
+      expect(
+        extractMentionedFiles("確認 @a.txt と @b.txt:2-3 と @b.txt:4", cwd),
+      ).toEqual([
+        {
+          path: "a.txt",
+          startLine: 1,
+          endLine: 100,
+          content: Array.from(
+            { length: 100 },
+            (_, index) => `line-${index + 1}`,
+          ).join("\n"),
+          truncated: true,
+        },
+        {
+          path: "b.txt",
+          startLine: 2,
+          endLine: 3,
+          content: "b\nc",
+          truncated: false,
+        },
+        {
+          path: "b.txt",
+          startLine: 4,
+          endLine: 4,
+          content: "d",
+          truncated: false,
+        },
+      ]);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("不正な行範囲はエラー付きメンションとして返す", () => {
+    const cwd = mkdtempSync(join(process.cwd(), "tmp-input-"));
+    try {
+      writeFileSync(join(cwd, "a.txt"), "a\nb\nc");
+
+      expect(
+        extractMentionedFiles(
+          "確認 @a.txt:10-1 と @a.txt:0 と @a.txt:5-6",
+          cwd,
+        ),
+      ).toEqual([
+        {
+          path: "a.txt",
+          startLine: 10,
+          endLine: 1,
+          content: null,
+          truncated: false,
+          error: "invalid_range",
+        },
+        {
+          path: "a.txt",
+          startLine: 0,
+          endLine: 0,
+          content: null,
+          truncated: false,
+          error: "invalid_range",
+        },
+        {
+          path: "a.txt",
+          startLine: 5,
+          endLine: 6,
+          content: null,
+          truncated: false,
+          error: "invalid_range",
+        },
+      ]);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  test("巨大ファイルとバイナリファイルはエラーを返す", () => {
+    const cwd = mkdtempSync(join(process.cwd(), "tmp-input-"));
+    try {
+      writeFileSync(join(cwd, "large.txt"), "a".repeat(60349));
+      writeFileSync(join(cwd, "binary.bin"), Buffer.from([0x61, 0x00, 0x62]));
+
+      expect(
+        extractMentionedFiles("確認 @large.txt と @binary.bin:1-1", cwd),
+      ).toEqual([
+        {
+          path: "large.txt",
+          startLine: 1,
+          endLine: 100,
+          content: null,
+          truncated: false,
+          error: "too_large",
+        },
+        {
+          path: "binary.bin",
+          startLine: 1,
+          endLine: 1,
+          content: null,
+          truncated: false,
+          error: "binary_file",
+        },
+      ]);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

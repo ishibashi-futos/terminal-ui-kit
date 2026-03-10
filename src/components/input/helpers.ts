@@ -1,5 +1,5 @@
 import { getDisplayWidth } from "../../utils/width";
-import { readdirSync, statSync, type Dirent } from "node:fs";
+import { readFileSync, readdirSync, statSync, type Dirent } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 interface InputLayout {
@@ -33,6 +33,28 @@ interface MentionPathState {
   replacementEnd: number;
   query: string;
 }
+
+export type InputMentionError = "binary_file" | "invalid_range" | "too_large";
+
+export interface InputMention {
+  path: string;
+  startLine: number;
+  endLine: number;
+  content: string | null;
+  truncated: boolean;
+  error?: InputMentionError;
+}
+
+interface ParsedMentionToken {
+  path: string;
+  startLine: number;
+  endLine: number;
+  hasExplicitRange: boolean;
+  hasInvalidRange: boolean;
+}
+
+const MAX_MENTION_DEFAULT_LINES = 100;
+const MAX_MENTION_FILE_SIZE_BYTES = 60348;
 
 /**
  * 入力バッファから描画用のデータとカーソル位置を計算する
@@ -311,6 +333,133 @@ function toUnixPath(value: string): string {
   return value.replace(/\\/g, "/");
 }
 
+function parseMentionToken(rawToken: string): ParsedMentionToken | null {
+  const normalized = toUnixPath(rawToken);
+  const separatorIndex = normalized.indexOf(":");
+
+  if (separatorIndex === -1) {
+    if (!normalized) {
+      return null;
+    }
+
+    return {
+      path: normalized,
+      startLine: 1,
+      endLine: MAX_MENTION_DEFAULT_LINES,
+      hasExplicitRange: false,
+      hasInvalidRange: false,
+    };
+  }
+
+  const path = normalized.slice(0, separatorIndex);
+  const rawRange = normalized.slice(separatorIndex + 1);
+  if (!path) {
+    return null;
+  }
+
+  const singleLineMatch = rawRange.match(/^(\d+)$/);
+  if (singleLineMatch) {
+    const line = Number.parseInt(singleLineMatch[1]!, 10);
+    return {
+      path,
+      startLine: line,
+      endLine: line,
+      hasExplicitRange: true,
+      hasInvalidRange: line <= 0,
+    };
+  }
+
+  const rangeMatch = rawRange.match(/^(\d+)-(\d+)$/);
+  if (rangeMatch) {
+    const startLine = Number.parseInt(rangeMatch[1]!, 10);
+    const endLine = Number.parseInt(rangeMatch[2]!, 10);
+    return {
+      path,
+      startLine,
+      endLine,
+      hasExplicitRange: true,
+      hasInvalidRange: startLine <= 0 || endLine <= 0 || startLine > endLine,
+    };
+  }
+
+  return {
+    path,
+    startLine: 1,
+    endLine: MAX_MENTION_DEFAULT_LINES,
+    hasExplicitRange: true,
+    hasInvalidRange: true,
+  };
+}
+
+function buildMentionError(
+  parsed: ParsedMentionToken,
+  error: InputMentionError,
+): InputMention {
+  return {
+    path: parsed.path,
+    startLine: parsed.startLine,
+    endLine: parsed.endLine,
+    content: null,
+    truncated: false,
+    error,
+  };
+}
+
+function resolveMentionContent(
+  parsed: ParsedMentionToken,
+  cwd: string,
+): InputMention | null {
+  const absolutePath = resolve(cwd, parsed.path);
+
+  let stat;
+  try {
+    stat = statSync(absolutePath);
+  } catch {
+    return null;
+  }
+
+  if (!stat.isFile()) {
+    return null;
+  }
+
+  if (parsed.hasInvalidRange) {
+    return buildMentionError(parsed, "invalid_range");
+  }
+
+  if (stat.size > MAX_MENTION_FILE_SIZE_BYTES) {
+    return buildMentionError(parsed, "too_large");
+  }
+
+  const buffer = readFileSync(absolutePath);
+  if (buffer.includes(0)) {
+    return buildMentionError(parsed, "binary_file");
+  }
+
+  const lines = buffer.toString("utf8").split(/\r?\n/);
+  if (parsed.hasExplicitRange) {
+    if (parsed.endLine > lines.length) {
+      return buildMentionError(parsed, "invalid_range");
+    }
+
+    return {
+      path: parsed.path,
+      startLine: parsed.startLine,
+      endLine: parsed.endLine,
+      content: lines.slice(parsed.startLine - 1, parsed.endLine).join("\n"),
+      truncated: false,
+    };
+  }
+
+  const endLine = Math.min(lines.length, MAX_MENTION_DEFAULT_LINES);
+  return {
+    path: parsed.path,
+    startLine: 1,
+    endLine,
+    content: lines.slice(0, endLine).join("\n"),
+    truncated: lines.length > MAX_MENTION_DEFAULT_LINES,
+  };
+}
+
 function resolveMentionCandidates(
   query: string,
   cwd: string,
@@ -376,7 +525,12 @@ function resolveMentionPathState(
   }
 
   const replacementStart = tokenStart + 1;
-  const replacementEnd = tokenEnd;
+  const rawQuery = token.slice(1);
+  const rangeSeparatorIndex = rawQuery.indexOf(":");
+  const replacementEnd =
+    rangeSeparatorIndex === -1
+      ? tokenEnd
+      : replacementStart + rangeSeparatorIndex;
   if (cursorIndex < replacementStart || cursorIndex > replacementEnd) {
     return null;
   }
@@ -568,12 +722,17 @@ export function extractMentionedFilePaths(
   const unique = new Set<string>();
 
   for (const match of matches) {
-    const rawPath = match[1];
-    if (!rawPath) {
+    const rawToken = match[1];
+    if (!rawToken) {
       continue;
     }
 
-    const filePath = toUnixPath(rawPath);
+    const parsed = parseMentionToken(rawToken);
+    if (!parsed) {
+      continue;
+    }
+
+    const filePath = parsed.path;
     try {
       const absolutePath = resolve(cwd, filePath);
       const stat = statSync(absolutePath);
@@ -586,4 +745,31 @@ export function extractMentionedFilePaths(
   }
 
   return Array.from(unique);
+}
+
+export function extractMentionedFiles(
+  input: string,
+  cwd: string = process.cwd(),
+): InputMention[] {
+  const matches = input.matchAll(/(?:^|[\s\n])@([^\s\n]+)/g);
+  const mentions: InputMention[] = [];
+
+  for (const match of matches) {
+    const rawToken = match[1];
+    if (!rawToken) {
+      continue;
+    }
+
+    const parsed = parseMentionToken(rawToken);
+    if (!parsed) {
+      continue;
+    }
+
+    const mention = resolveMentionContent(parsed, cwd);
+    if (mention !== null) {
+      mentions.push(mention);
+    }
+  }
+
+  return mentions;
 }

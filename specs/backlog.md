@@ -7,3 +7,4 @@
 - [x] `input` の 途中で、 `@`から始まる入力では `@path/to/file` で、デフォルトでworking directoryからのパス入力・ファイル指定ができるようにする。指定されたファイルは、戻り値でパスを返せるようにする。
 - [x] inputでのHome / End などのジャンプキー操作への対応
 - [x] クロスプラットフォームのOS通知. Windows: pwsh.exe, macOS: osascript
+- [x] inputでファイルメンションした際 `@path/to/file:1-10` のように入力すると、指定したファイルの 1-10行目が取れるようになる

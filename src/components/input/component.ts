@@ -8,7 +8,9 @@ import {
   buildInputLines,
   completeMentionPath,
   completeSlashCommand,
+  extractMentionedFiles,
   extractMentionedFilePaths,
+  type InputMention,
   type InputCommand,
   normalizeInputChunk,
   resolveMentionPathHints,
@@ -31,6 +33,7 @@ export interface InputOptions {
 export interface InputResult {
   value: string;
   paths: string[];
+  mentions: InputMention[];
 }
 
 export interface InputStickyStatusState {
@@ -184,6 +187,7 @@ export async function input(
 
           const result = buffer;
           const paths = extractMentionedFilePaths(result);
+          const mentions = extractMentionedFiles(result);
           history.add(result);
           options.stickyStatusBar?.bar.clear();
           render(false);
@@ -195,7 +199,7 @@ export async function input(
             reject(error);
             return;
           }
-          resolve({ value: result, paths });
+          resolve({ value: result, paths, mentions });
           return;
         },
         UP: () => {
