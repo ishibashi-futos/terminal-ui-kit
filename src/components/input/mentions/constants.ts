@@ -1,0 +1,2 @@
+export const MAX_MENTION_DEFAULT_LINES = 100;
+export const MAX_MENTION_FILE_SIZE_BYTES = 60348;

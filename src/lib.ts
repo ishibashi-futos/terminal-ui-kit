@@ -14,7 +14,7 @@ import {
   type InputCommand,
   type InputMention,
   type InputMentionError,
-} from "./components/input/helpers";
+} from "./components/input/types";
 import {
   printError,
   printStatus,

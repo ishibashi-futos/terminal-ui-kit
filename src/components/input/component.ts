@@ -3,22 +3,27 @@ import { type StickyStatusBar } from "../sticky-status-bar/component";
 import { type HistoryManager } from "../../utils/history";
 import { getDisplayWidth } from "../../utils/width";
 import {
-  buildMentionPathHintLines,
-  buildSlashCommandHintLines,
-  buildInputLines,
-  completeMentionPath,
   completeSlashCommand,
+  buildSlashCommandHintLines,
+  resolveSlashCommandState,
+  runSlashCommandCallback,
+} from "./slash-command";
+import { buildInputLines } from "./layout";
+import {
+  buildMentionPathHintLines,
+  completeMentionPath,
+  resolveMentionPathHints,
+} from "./mentions/path-completion";
+import {
   extractMentionedFiles,
   extractMentionedFilePaths,
-  type InputMention,
-  type InputCommand,
-  normalizeInputChunk,
-  resolveMentionPathHints,
+} from "./mentions/extract";
+import {
   resolveLineJumpCursorIndex,
-  runSlashCommandCallback,
-  resolveSlashCommandState,
   resolveVerticalCursorMove,
-} from "./helpers";
+} from "./cursor";
+import { type InputMention, type InputCommand } from "./types";
+import { normalizeInputChunk } from "./text-normalization";
 
 export interface InputOptions {
   commands?: InputCommand[];
